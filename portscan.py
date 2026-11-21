@@ -5,12 +5,15 @@ Para cada porta, tenta abrir uma conexão TCP completa com o destino e
 classifica o resultado em: aberta, fechada (recusada), timeout ou erro.
 
 Exemplo:
-    python3 portscan.py localhost -p 20-25,80,8000 -t 0.5
+    python3 portscan.py localhost -p 20-25,80,8000 -t 0.5 -o resultado.json
 """
 
 import argparse
+import csv
+import json
 import socket
 import sys
+import time
 from datetime import datetime
 
 ABERTA = "aberta"    # handshake completo: algum serviço aceitou a conexão
@@ -81,13 +84,17 @@ def timeout_valido(texto):
 def ler_argumentos(argv=None):
     parser = argparse.ArgumentParser(
         description="Port scanner TCP (connect scan). Use apenas em sistemas próprios ou autorizados.",
-        epilog="exemplo: python3 portscan.py localhost -p 20-25,80,8000 -t 0.5",
+        epilog="exemplo: python3 portscan.py localhost -p 20-25,80,8000 -t 0.5 -o resultado.csv",
     )
     parser.add_argument("destino", help="IP ou hostname do alvo (ex.: 127.0.0.1, localhost)")
     parser.add_argument("-p", "--portas", required=True,
                         help="porta (80), intervalo (20-25) ou lista (22,80,8000-8010)")
     parser.add_argument("-t", "--timeout", type=timeout_valido, default=1.0,
                         help="tempo limite de cada tentativa, em segundos (padrão: 1.0)")
+    parser.add_argument("-o", "--saida",
+                        help="salva os resultados em arquivo .csv ou .json")
+    parser.add_argument("-a", "--abertas", action="store_true",
+                        help="mostra na tela apenas as portas abertas")
 
     args = parser.parse_args(argv)
 
@@ -97,6 +104,8 @@ def ler_argumentos(argv=None):
         args.ip = resolver_destino(args.destino)
     except ValueError as erro:
         parser.error(str(erro))
+    if args.saida and not args.saida.lower().endswith((".csv", ".json")):
+        parser.error("o arquivo de saída precisa terminar em .csv ou .json")
     return args
 
 
@@ -130,11 +139,22 @@ def interpretar(erro):
     return ERRO, erro.strerror or str(erro)
 
 
+def servico_provavel(porta):
+    """Nome normalmente associado à porta (tabela do sistema).
+
+    É só um palpite: não confirma qual serviço está realmente rodando.
+    """
+    try:
+        return socket.getservbyport(porta, "tcp")
+    except OSError:
+        return "-"
+
+
 # ---------------------------------------------------------------------------
 # 4. Registrar e apresentar
 # ---------------------------------------------------------------------------
 
-FORMATO_LINHA = "{destino:<16} {porta:>5}  {resultado:<10} {detalhe}"
+FORMATO_LINHA = "{destino:<16} {porta:>5}  {resultado:<10} {servico:<18} {detalhe}"
 
 
 def imprimir_cabecalho(args):
@@ -143,10 +163,10 @@ def imprimir_cabecalho(args):
           f"Início: {datetime.now():%Y-%m-%d %H:%M:%S}")
     print()
     print(FORMATO_LINHA.format(destino="DESTINO", porta="PORTA", resultado="RESULTADO",
-                               detalhe="DETALHE"))
+                               servico="SERVIÇO (palpite)", detalhe="DETALHE"))
 
 
-def imprimir_resumo(resultados, total, interrompido):
+def imprimir_resumo(resultados, total, duracao, interrompido):
     contagem = {estado: 0 for estado in (ABERTA, FECHADA, TIMEOUT, ERRO)}
     for r in resultados:
         contagem[r["resultado"]] += 1
@@ -156,8 +176,30 @@ def imprimir_resumo(resultados, total, interrompido):
     if interrompido:
         print(f"Varredura interrompida pelo usuário: {len(resultados)} de {total} portas testadas.")
     print(f"Resumo: {contagem[ABERTA]} aberta(s), {contagem[FECHADA]} fechada(s), "
-          f"{contagem[TIMEOUT]} timeout, {contagem[ERRO]} erro")
+          f"{contagem[TIMEOUT]} timeout, {contagem[ERRO]} erro | tempo total: {duracao:.2f}s")
     print("Portas abertas: " + (", ".join(abertas) if abertas else "nenhuma"))
+
+
+def exportar(caminho, args, resultados, duracao, interrompido):
+    """Salva os resultados em CSV (uma linha por porta) ou JSON (com metadados)."""
+    if caminho.lower().endswith(".csv"):
+        with open(caminho, "w", newline="", encoding="utf-8") as arquivo:
+            campos = ["destino", "ip", "porta", "resultado", "servico", "detalhe"]
+            escritor = csv.DictWriter(arquivo, fieldnames=campos)
+            escritor.writeheader()
+            escritor.writerows(resultados)
+    else:
+        dados = {
+            "destino": args.destino,
+            "ip": args.ip,
+            "timeout_s": args.timeout,
+            "data": datetime.now().isoformat(timespec="seconds"),
+            "duracao_s": round(duracao, 3),
+            "interrompido": interrompido,
+            "resultados": resultados,
+        }
+        with open(caminho, "w", encoding="utf-8") as arquivo:
+            json.dump(dados, arquivo, indent=2, ensure_ascii=False)
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +212,7 @@ def main(argv=None):
 
     resultados = []
     interrompido = False
+    inicio = time.perf_counter()
     try:
         for porta in args.lista_portas:
             resultado, detalhe = interpretar(tentar_conexao(args.ip, porta, args.timeout))
@@ -178,14 +221,27 @@ def main(argv=None):
                 "ip": args.ip,
                 "porta": porta,
                 "resultado": resultado,
+                "servico": servico_provavel(porta),
                 "detalhe": detalhe,
             }
             resultados.append(registro)
-            print(FORMATO_LINHA.format(**registro), flush=True)
+            if resultado == ABERTA or not args.abertas:
+                print(FORMATO_LINHA.format(**registro), flush=True)
     except KeyboardInterrupt:
         interrompido = True
+    duracao = time.perf_counter() - inicio
 
-    imprimir_resumo(resultados, len(args.lista_portas), interrompido)
+    imprimir_resumo(resultados, len(args.lista_portas), duracao, interrompido)
+
+    if args.saida:
+        try:
+            exportar(args.saida, args, resultados, duracao, interrompido)
+            print(f"Resultados salvos em: {args.saida}")
+        except OSError as erro:
+            sys.stdout.flush()  # garante que o resumo aparece antes da mensagem de erro
+            print(f"Erro ao salvar '{args.saida}': {erro.strerror or erro}", file=sys.stderr)
+            return 1
+
     return 130 if interrompido else 0
 
 
