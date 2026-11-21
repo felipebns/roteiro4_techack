@@ -5,7 +5,7 @@ Para cada porta, tenta abrir uma conexão TCP completa com o destino e
 classifica o resultado em: aberta, fechada (recusada), timeout ou erro.
 
 Exemplo:
-    python3 portscan.py localhost -p 20-25 -t 0.5
+    python3 portscan.py localhost -p 20-25,80,8000 -t 0.5
 """
 
 import argparse
@@ -20,26 +20,84 @@ ERRO = "erro"        # outra falha (rede inalcançável, permissão, etc.)
 
 
 # ---------------------------------------------------------------------------
-# 1. Receber os parâmetros
+# 1. Receber e validar os parâmetros
 # ---------------------------------------------------------------------------
 
+def ler_porta(texto):
+    """Converte um texto em número de porta, garantindo que está entre 1 e 65535."""
+    try:
+        porta = int(texto)
+    except ValueError:
+        raise ValueError(f"porta inválida: '{texto.strip()}' (use números de 1 a 65535)") from None
+    if not 1 <= porta <= 65535:
+        raise ValueError(f"porta fora do intervalo 1-65535: {porta}")
+    return porta
+
+
 def parse_portas(texto):
-    """Interpreta '80' ou um intervalo '20-25'."""
-    if "-" in texto:
-        inicio, fim = texto.split("-")
-        return list(range(int(inicio), int(fim) + 1))
-    return [int(texto)]
+    """Interpreta '80', '20-25' ou combinações como '22,80,8000-8010'.
+
+    Devolve a lista de portas na ordem informada, sem repetições.
+    """
+    portas = []
+    for parte in texto.split(","):
+        parte = parte.strip()
+        if not parte:
+            raise ValueError(f"lista de portas mal formada: '{texto}'")
+        if "-" in parte:
+            inicio, _, fim = parte.partition("-")
+            if not inicio.strip() or not fim.strip():
+                raise ValueError(f"intervalo incompleto: '{parte}' (use o formato início-fim)")
+            inicio, fim = ler_porta(inicio), ler_porta(fim)
+            if inicio > fim:
+                raise ValueError(f"intervalo inválido: '{parte}' (início maior que o fim)")
+            portas.extend(range(inicio, fim + 1))
+        else:
+            portas.append(ler_porta(parte))
+    return list(dict.fromkeys(portas))  # remove repetidas mantendo a ordem
+
+
+def resolver_destino(destino):
+    """Converte hostname ou IP em um endereço IPv4. Erro se não for possível."""
+    if not destino.strip():
+        raise ValueError("destino vazio")
+    try:
+        return socket.gethostbyname(destino)
+    except (OSError, UnicodeError):
+        raise ValueError(f"destino inválido ou não encontrado: '{destino}'") from None
+
+
+def timeout_valido(texto):
+    """Usado pelo argparse para aceitar apenas timeouts positivos."""
+    try:
+        valor = float(texto)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"timeout inválido: '{texto}'") from None
+    if not 0 < valor <= 60:
+        raise argparse.ArgumentTypeError("o timeout deve ser maior que 0 e no máximo 60 segundos")
+    return valor
 
 
 def ler_argumentos(argv=None):
     parser = argparse.ArgumentParser(
         description="Port scanner TCP (connect scan). Use apenas em sistemas próprios ou autorizados.",
+        epilog="exemplo: python3 portscan.py localhost -p 20-25,80,8000 -t 0.5",
     )
     parser.add_argument("destino", help="IP ou hostname do alvo (ex.: 127.0.0.1, localhost)")
-    parser.add_argument("-p", "--portas", required=True, help="porta (80) ou intervalo (20-25)")
-    parser.add_argument("-t", "--timeout", type=float, default=1.0,
+    parser.add_argument("-p", "--portas", required=True,
+                        help="porta (80), intervalo (20-25) ou lista (22,80,8000-8010)")
+    parser.add_argument("-t", "--timeout", type=timeout_valido, default=1.0,
                         help="tempo limite de cada tentativa, em segundos (padrão: 1.0)")
-    return parser.parse_args(argv)
+
+    args = parser.parse_args(argv)
+
+    # validações feitas aqui para que os erros apareçam junto com a ajuda de uso
+    try:
+        args.lista_portas = parse_portas(args.portas)
+        args.ip = resolver_destino(args.destino)
+    except ValueError as erro:
+        parser.error(str(erro))
+    return args
 
 
 # ---------------------------------------------------------------------------
@@ -49,7 +107,8 @@ def ler_argumentos(argv=None):
 def tentar_conexao(ip, porta, timeout):
     """Tenta o handshake TCP. Devolve None se conectou, ou a exceção que ocorreu.
 
-    O 'with' garante que o socket é fechado em qualquer caso.
+    O 'with' garante que o socket é fechado em qualquer caso
+    (sucesso, erro ou Ctrl+C no meio da tentativa).
     """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(timeout)
@@ -87,13 +146,15 @@ def imprimir_cabecalho(args):
                                detalhe="DETALHE"))
 
 
-def imprimir_resumo(resultados):
+def imprimir_resumo(resultados, total, interrompido):
     contagem = {estado: 0 for estado in (ABERTA, FECHADA, TIMEOUT, ERRO)}
     for r in resultados:
         contagem[r["resultado"]] += 1
     abertas = [str(r["porta"]) for r in resultados if r["resultado"] == ABERTA]
 
     print()
+    if interrompido:
+        print(f"Varredura interrompida pelo usuário: {len(resultados)} de {total} portas testadas.")
     print(f"Resumo: {contagem[ABERTA]} aberta(s), {contagem[FECHADA]} fechada(s), "
           f"{contagem[TIMEOUT]} timeout, {contagem[ERRO]} erro")
     print("Portas abertas: " + (", ".join(abertas) if abertas else "nenhuma"))
@@ -105,26 +166,32 @@ def imprimir_resumo(resultados):
 
 def main(argv=None):
     args = ler_argumentos(argv)
-    args.lista_portas = parse_portas(args.portas)
-    args.ip = socket.gethostbyname(args.destino)
     imprimir_cabecalho(args)
 
     resultados = []
-    for porta in args.lista_portas:
-        resultado, detalhe = interpretar(tentar_conexao(args.ip, porta, args.timeout))
-        registro = {
-            "destino": args.destino,
-            "ip": args.ip,
-            "porta": porta,
-            "resultado": resultado,
-            "detalhe": detalhe,
-        }
-        resultados.append(registro)
-        print(FORMATO_LINHA.format(**registro), flush=True)
+    interrompido = False
+    try:
+        for porta in args.lista_portas:
+            resultado, detalhe = interpretar(tentar_conexao(args.ip, porta, args.timeout))
+            registro = {
+                "destino": args.destino,
+                "ip": args.ip,
+                "porta": porta,
+                "resultado": resultado,
+                "detalhe": detalhe,
+            }
+            resultados.append(registro)
+            print(FORMATO_LINHA.format(**registro), flush=True)
+    except KeyboardInterrupt:
+        interrompido = True
 
-    imprimir_resumo(resultados)
-    return 0
+    imprimir_resumo(resultados, len(args.lista_portas), interrompido)
+    return 130 if interrompido else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:  # Ctrl+C fora da varredura (ex.: resolvendo o DNS)
+        print("\nInterrompido pelo usuário.", file=sys.stderr)
+        sys.exit(130)
