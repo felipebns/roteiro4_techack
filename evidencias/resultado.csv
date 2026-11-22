@@ -1,0 +1,6 @@
+destino,ip,porta,resultado,servico,detalhe
+localhost,127.0.0.1,5432,aberta,postgresql,conexão estabelecida
+localhost,127.0.0.1,7000,fechada,afs3-fileserver,conexão recusada
+localhost,127.0.0.1,8000,aberta,irdmi,conexão estabelecida
+localhost,127.0.0.1,8080,aberta,http-alt,conexão estabelecida
+localhost,127.0.0.1,9090,timeout,websm,sem resposta no tempo limite

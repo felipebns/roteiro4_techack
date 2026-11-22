@@ -1,0 +1,50 @@
+{
+  "destino": "localhost",
+  "ip": "127.0.0.1",
+  "timeout_s": 1.0,
+  "data": "2026-11-20T10:55:23",
+  "duracao_s": 1.005,
+  "interrompido": false,
+  "resultados": [
+    {
+      "destino": "localhost",
+      "ip": "127.0.0.1",
+      "porta": 5432,
+      "resultado": "aberta",
+      "servico": "postgresql",
+      "detalhe": "conexão estabelecida"
+    },
+    {
+      "destino": "localhost",
+      "ip": "127.0.0.1",
+      "porta": 7000,
+      "resultado": "fechada",
+      "servico": "afs3-fileserver",
+      "detalhe": "conexão recusada"
+    },
+    {
+      "destino": "localhost",
+      "ip": "127.0.0.1",
+      "porta": 8000,
+      "resultado": "aberta",
+      "servico": "irdmi",
+      "detalhe": "conexão estabelecida"
+    },
+    {
+      "destino": "localhost",
+      "ip": "127.0.0.1",
+      "porta": 8080,
+      "resultado": "aberta",
+      "servico": "http-alt",
+      "detalhe": "conexão estabelecida"
+    },
+    {
+      "destino": "localhost",
+      "ip": "127.0.0.1",
+      "porta": 9090,
+      "resultado": "timeout",
+      "servico": "websm",
+      "detalhe": "sem resposta no tempo limite"
+    }
+  ]
+}

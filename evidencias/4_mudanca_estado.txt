@@ -1,0 +1,58 @@
+# 4. Experimento de mudança de estado (porta 8000, python3 -m http.server) — 2026-11-20 10:55
+
+## Rodada A — serviço ativo
+$ ss -ltn | grep -E ':(5432|7000|8000|8080|9090) '
+LISTEN 1      0          127.0.0.1:9090       0.0.0.0:*
+LISTEN 0      5          127.0.0.1:8000       0.0.0.0:*
+LISTEN 0      128        127.0.0.1:8080       0.0.0.0:*
+LISTEN 0      4096         0.0.0.0:5432       0.0.0.0:*
+LISTEN 0      4096            [::]:5432          [::]:*
+
+$ python3 portscan.py localhost -p 8000
+Destino: localhost (127.0.0.1)
+Portas: 1 | Timeout: 1.0s | Início: 2026-11-20 10:55:19
+
+DESTINO          PORTA  RESULTADO  SERVIÇO (palpite)  DETALHE
+localhost         8000  aberta     irdmi              conexão estabelecida
+
+Resumo: 1 aberta(s), 0 fechada(s), 0 timeout, 0 erro | tempo total: 0.00s
+Portas abertas: 8000
+(código de saída: 0)
+
+## Rodada B — serviço interrompido
+$ ss -ltn | grep -E ':(5432|7000|8000|8080|9090) '
+LISTEN 1      0          127.0.0.1:9090       0.0.0.0:*
+LISTEN 0      128        127.0.0.1:8080       0.0.0.0:*
+LISTEN 0      4096         0.0.0.0:5432       0.0.0.0:*
+LISTEN 0      4096            [::]:5432          [::]:*
+
+$ python3 portscan.py localhost -p 8000
+Destino: localhost (127.0.0.1)
+Portas: 1 | Timeout: 1.0s | Início: 2026-11-20 10:55:20
+
+DESTINO          PORTA  RESULTADO  SERVIÇO (palpite)  DETALHE
+localhost         8000  fechada    irdmi              conexão recusada
+
+Resumo: 0 aberta(s), 1 fechada(s), 0 timeout, 0 erro | tempo total: 0.00s
+Portas abertas: nenhuma
+(código de saída: 0)
+
+## Rodada C — serviço reiniciado
+$ ss -ltn | grep -E ':(5432|7000|8000|8080|9090) '
+LISTEN 1      0          127.0.0.1:9090       0.0.0.0:*
+LISTEN 0      5          127.0.0.1:8000       0.0.0.0:*
+LISTEN 0      128        127.0.0.1:8080       0.0.0.0:*
+LISTEN 0      4096         0.0.0.0:5432       0.0.0.0:*
+LISTEN 0      4096            [::]:5432          [::]:*
+
+$ python3 portscan.py localhost -p 8000
+Destino: localhost (127.0.0.1)
+Portas: 1 | Timeout: 1.0s | Início: 2026-11-20 10:55:21
+
+DESTINO          PORTA  RESULTADO  SERVIÇO (palpite)  DETALHE
+localhost         8000  aberta     irdmi              conexão estabelecida
+
+Resumo: 1 aberta(s), 0 fechada(s), 0 timeout, 0 erro | tempo total: 0.00s
+Portas abertas: 8000
+(código de saída: 0)
+

@@ -1,0 +1,45 @@
+# 1. Testes iniciais — 2026-11-20 10:55
+# Ambiente: 127.0.0.1
+#   5432 = PostgreSQL já instalado na máquina
+#   7000 = nada escutando
+#   8000 = python3 -m http.server 8000
+#   8080 = lab.py (porta aberta)
+#   9090 = lab.py (porta silenciosa: descarta o SYN)
+
+## Portas em escuta segundo o sistema operacional
+$ ss -ltn | grep -E ':(5432|7000|8000|8080|9090) '
+LISTEN 1      0          127.0.0.1:9090       0.0.0.0:*
+LISTEN 0      5          127.0.0.1:8000       0.0.0.0:*
+LISTEN 0      128        127.0.0.1:8080       0.0.0.0:*
+LISTEN 0      4096         0.0.0.0:5432       0.0.0.0:*
+LISTEN 0      4096            [::]:5432          [::]:*
+
+## Scanner
+$ python3 portscan.py localhost -p 5432,7000,8000,8080,9090 -t 1
+Destino: localhost (127.0.0.1)
+Portas: 5 | Timeout: 1.0s | Início: 2026-11-20 10:55:09
+
+DESTINO          PORTA  RESULTADO  SERVIÇO (palpite)  DETALHE
+localhost         5432  aberta     postgresql         conexão estabelecida
+localhost         7000  fechada    afs3-fileserver    conexão recusada
+localhost         8000  aberta     irdmi              conexão estabelecida
+localhost         8080  aberta     http-alt           conexão estabelecida
+localhost         9090  timeout    websm              sem resposta no tempo limite
+
+Resumo: 3 aberta(s), 1 fechada(s), 1 timeout, 0 erro | tempo total: 1.01s
+Portas abertas: 5432, 8000, 8080
+(código de saída: 0)
+
+## Somente portas abertas (-a), em um intervalo maior
+$ python3 portscan.py localhost -p 7990-8090 -a -t 0.5
+Destino: localhost (127.0.0.1)
+Portas: 101 | Timeout: 0.5s | Início: 2026-11-20 10:55:10
+
+DESTINO          PORTA  RESULTADO  SERVIÇO (palpite)  DETALHE
+localhost         8000  aberta     irdmi              conexão estabelecida
+localhost         8080  aberta     http-alt           conexão estabelecida
+
+Resumo: 2 aberta(s), 99 fechada(s), 0 timeout, 0 erro | tempo total: 0.18s
+Portas abertas: 8000, 8080
+(código de saída: 0)
+

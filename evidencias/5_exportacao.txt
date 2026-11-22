@@ -1,0 +1,34 @@
+# 5. Melhoria: exportação dos resultados — 2026-11-20 10:55
+
+$ python3 portscan.py localhost -p 5432,7000,8000,8080,9090 -o evidencias/resultado.csv
+Destino: localhost (127.0.0.1)
+Portas: 5 | Timeout: 1.0s | Início: 2026-11-20 10:55:21
+
+DESTINO          PORTA  RESULTADO  SERVIÇO (palpite)  DETALHE
+localhost         5432  aberta     postgresql         conexão estabelecida
+localhost         7000  fechada    afs3-fileserver    conexão recusada
+localhost         8000  aberta     irdmi              conexão estabelecida
+localhost         8080  aberta     http-alt           conexão estabelecida
+localhost         9090  timeout    websm              sem resposta no tempo limite
+
+Resumo: 3 aberta(s), 1 fechada(s), 1 timeout, 0 erro | tempo total: 1.01s
+Portas abertas: 5432, 8000, 8080
+Resultados salvos em: evidencias/resultado.csv
+(código de saída: 0)
+
+$ python3 portscan.py localhost -p 5432,7000,8000,8080,9090 -o evidencias/resultado.json
+Destino: localhost (127.0.0.1)
+Portas: 5 | Timeout: 1.0s | Início: 2026-11-20 10:55:22
+
+DESTINO          PORTA  RESULTADO  SERVIÇO (palpite)  DETALHE
+localhost         5432  aberta     postgresql         conexão estabelecida
+localhost         7000  fechada    afs3-fileserver    conexão recusada
+localhost         8000  aberta     irdmi              conexão estabelecida
+localhost         8080  aberta     http-alt           conexão estabelecida
+localhost         9090  timeout    websm              sem resposta no tempo limite
+
+Resumo: 3 aberta(s), 1 fechada(s), 1 timeout, 0 erro | tempo total: 1.01s
+Portas abertas: 5432, 8000, 8080
+Resultados salvos em: evidencias/resultado.json
+(código de saída: 0)
+
