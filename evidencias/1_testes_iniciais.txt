@@ -1,6 +1,6 @@
 # 1. Testes iniciais — 2026-11-20 10:55
 # Ambiente: 127.0.0.1
-#   5432 = PostgreSQL já instalado na máquina
+#   5432 = PostgreSQL (contêiner Docker que já rodava na máquina)
 #   7000 = nada escutando
 #   8000 = python3 -m http.server 8000
 #   8080 = lab.py (porta aberta)

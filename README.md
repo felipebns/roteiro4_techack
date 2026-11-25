@@ -112,4 +112,3 @@ a exportação, o Ctrl+C e a falha ao salvar o arquivo.
 - `lab.py`: ambiente de teste local
 - `test_portscan.py`: testes automatizados
 - `evidencias/`: saídas dos testes, da comparação com o Nmap e do experimento de mudança de estado
-- `relatorio.docx`: relatório técnico
